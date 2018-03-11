@@ -12,6 +12,8 @@ import cv2
 import progressbar
 import sys
 from platypus import NSGAII, Problem, Real
+from sklearn.model_selection import train_test_split
+import csv
 
 
 from random import shuffle
@@ -21,9 +23,9 @@ from platypus import *
 print(sys.version)
 
 #Salvar em arquivos
-def writeCSV(self, nameFile, row):
-      self.fileCSV = csv.writer(open(nameFile, "a"))
-      self.fileCSV.writerow(row)
+def writeCSV(nameFile, row):
+      fileCSV = csv.writer(open(nameFile, "a"))
+      fileCSV.writerow(row)
 
 # Retorna quantidade de imagens em diretorio
 def getNumSamples(src):
@@ -36,7 +38,7 @@ def getNumSamples(src):
 
     return sum, len(os.listdir(src))
 
-
+'''
 # Carrega base de dados e converte em array numpy
 def array_from_dir(data_dir, nb_samples, nb_classes, width, height):
     images = np.zeros((nb_samples, width, height, 1))
@@ -125,7 +127,7 @@ batch_size = 200
 nb_db_samples, num_classes = getNumSamples(pasta_base)
 
 print('Base tem ', nb_db_samples, ' imagens e ', num_classes, ' classes')
-
+'''
 class script(Problem):
         def __init__(self, name, base_x, base_y):
         						#0			1			2				3
@@ -158,7 +160,7 @@ class script(Problem):
         def evaluate(self, solution):
                 print(solution)
                 print("Rescaling database")
-                X_train,X_test, y_train,y_test = split_dataset_random(self.base_x,self.base_y,test_size=0.2,random_state=0) 
+                X_train,X_test, y_train,y_test = train_test_split(self.base_x,self.base_y,test_size=0.2,random_state=0) 
                 
                 print("Train Shape",X_train.shape,"\nTeste Shap:",X_test.shape)
                 
@@ -167,6 +169,7 @@ class script(Problem):
                         pad1="valid"
                 else:
                         pad1="same"
+                pad1="same"
 
                 model = Sequential()
 
@@ -181,6 +184,7 @@ class script(Problem):
                         pad2="valid"
                 else:
                         pad2="same"
+                pad2="same"
 
                 model.add(Conv2D(filters=solution.variables[4], #se filters 0 da erro
                         kernel_size=solution.variables[7],#era 3
@@ -196,6 +200,7 @@ class script(Problem):
                         pad3="valid"
                 else:
                         pad3="same"
+                pad3="same"
                 model.add(Conv2D(filters=solution.variables[10], #se filters 0 da erro
                         kernel_size=solution.variables[13],#era 3
                         strides=solution.variables[12], #era 1
