@@ -14,8 +14,10 @@ import sys
 from platypus import NSGAII, Problem, Real
 from sklearn.model_selection import train_test_split
 import csv
+from sklearn.metrics import classification_report, precision_recall_fscore_support, accuracy_score
+import copy
 
-
+from random import *
 from random import shuffle
 
 from platypus import *
@@ -26,7 +28,19 @@ print(sys.version)
 def writeCSV(nameFile, row):
       fileCSV = csv.writer(open(nameFile, "a"))
       fileCSV.writerow(row)
-      
+
+# Retorna quantidade de imagens em diretorio
+def getNumSamples(src):
+    sum = 0
+    for cl in os.listdir(src):
+        class_dir = os.path.join(src, cl)
+        files = os.listdir(class_dir)
+        l = len(files)
+        sum += l
+
+    return sum, len(os.listdir(src))
+
+
 class script(Problem):
         def __init__(self, name, base_x, base_y):
         						#0			1			2				3
@@ -40,7 +54,7 @@ class script(Problem):
                             	#14
                             Integer(1,2),
                             	#15
-                            Integer(0,4)]
+                            Integer(1,6)]
 
                 variables = len(encoding)
                 objectives = 4
@@ -55,62 +69,62 @@ class script(Problem):
                 self.epochs = 50#repeticoes
                 self.solucoes={}#dicionario de solucoes
                 self.id = 0
+                self.X_train=None;
+
+        def DefaulttDNN(self):
+              print("Train Shape",self.X_train.shape[1:])
+              model = Sequential()
+              input1=random.randint(1,9)
+              input2=random.randint(1,124)
+              input3=random.randint(1,2)
+              input4=random.randint(1,2)
+              input5=random.randint(1,9)
+              input6=random.randint(1,124)
+              input7=random.randint(1,2)
+              model.add(Conv2D(filters=input1, kernel_size=input2, strides=input3 ,padding="same", input_shape=self.X_train.shape[1:]))
+              model.add(Conv2D(filters=input1, kernel_size=input2, strides=input3 ,padding="same"))
+              pool=random.randint(2,3)
+
+              model.add(MaxPooling2D(pool_size=(pool,pool), strides=input4))
+              model.add(Conv2D(filters=input5, kernel_size=input6,strides=input7, padding="same"))
+              model.add(Flatten())
+              model.add(Dense(units=5, activation='sigmoid'))
+              return model
+
+        def ModifieddDNN(self,numCamadasModf, model, solution):
+            print(solution)
+            md=Sequential()
+            for i in range(1,7,1):
+                  if(i<numCamadasModf or i==5):
+                        md.add(model.get_layer(None,i))
+                  else:
+                        if(i==1): md.add(Conv2D(filters=solution.variables[0], kernel_size=solution.variables[3], strides=solution.variables[2], padding="same",input_shape=self.X_train.shape[1:]))
+                        elif(i==2 or i==4): md.add(Conv2D(filters=solution.variables[10], kernel_size=solution.variables[13], strides=solution.variables[12], padding="same"))
+                        elif(i==3): md.add(MaxPooling2D(pool_size=(solution.variables[8],solution.variables[8]), strides=solution.variables[9]))
+                        elif(i==6): md.add(Dense(units=5,activation='sigmoid'))
+            return md
+
+	def getSolucaoFinal(self,info):
+                return self.solucoes.get(info)
+
 
         def evaluate(self, solution):
-                print(solution)
+
                 print("Rescaling database")
+
                 X_train,X_test, y_train,y_test = train_test_split(self.base_x,self.base_y,test_size=0.2,random_state=0) 
-                
-                print("Train Shape",X_train.shape,"\nTeste Shap:",X_test.shape)
-                
+                                
                 print("Criando o modelo")
-                if(solution.variables[1]==0):
-                        pad1="valid"
-                else:
-                        pad1="same"
-                pad1="same"
 
-                model = Sequential()
+                self.X_train=X_train
 
-                model.add(Conv2D(filters=solution.variables[0], #se filters 0 da erro
-                        kernel_size=solution.variables[3],#era 3
-                        strides=solution.variables[2], #era 1
-                        padding=pad1,
-                        input_shape=X_train.shape[1:]
-                        ))
+                modelPadrao= self.DefaulttDNN()
 
-                if(solution.variables[5]==0):
-                        pad2="valid"
-                else:
-                        pad2="same"
-                pad2="same"
+                #print(modelPadrao.summary())
 
-                model.add(Conv2D(filters=solution.variables[4], #se filters 0 da erro
-                        kernel_size=solution.variables[7],#era 3
-                        strides=solution.variables[6], #era 1
-                        padding=pad2,
-                        input_shape=X_train.shape[1:]
-                        ))
+                model=self.ModifieddDNN(numCamadasModf=solution.variables[15], model=modelPadrao,solution=solution)
 
-                model.add(MaxPooling2D(pool_size=(solution.variables[8],solution.variables[8]), 
-                        strides=solution.variables[9]))#era 1
-
-                if(solution.variables[11]==0):
-                        pad3="valid"
-                else:
-                        pad3="same"
-                pad3="same"
-                model.add(Conv2D(filters=solution.variables[10], #se filters 0 da erro
-                        kernel_size=solution.variables[13],#era 3
-                        strides=solution.variables[12], #era 1
-                        padding=pad3,
-                        input_shape=X_train.shape[1:]
-                        ))
-                model.add(Flatten())
-                model.add(Dense(units=5#numero de classes 
-                        ,activation='sigmoid'))
-
-                print(model.summary())
+                #print(model.summary())
 
                 print("Compilando")
                 learning_rate = 0.1
@@ -118,9 +132,6 @@ class script(Problem):
                 momentum = 0.8
                 sgd = SGD(lr=learning_rate, momentum=momentum, decay=decay_rate, nesterov=False)
                 model.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy','precision','recall', 'f1'])
-
-
-                print("\nSalvando o diagrama do modelo")
 
                 print("Iniciando treinamento")
                 earlyStopping = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10, verbose=1, mode='auto')
@@ -130,9 +141,10 @@ class script(Problem):
                         validation_split=0.33,
                         shuffle=True,
                         verbose=2)
+
                	train_acc = history.history['acc'][-1]
                 val_acc = history.history['val_acc'][-1]
-
+		
                 train_recall = history.history['recall'][-1]
                 val_recall = history.history['val_recall'][-1]
 
@@ -143,7 +155,20 @@ class script(Problem):
                 train_f1 = history.history['f1'][-1]
                 val_f1 = history.history['val_f1'][-1]
 
+		#metrics################################################################
+                #print('\n acc' , val_acc)
+                #predictions = model.predict(X_test, batch_size=self.batch_size)
 
+                #print(classification_report(y_test.argmax(axis=1),
+                #                    predictions.argmax(axis=1)))
+                #report_lr = precision_recall_fscore_support(y_test.argmax(axis=1),
+                #                    predictions.argmax(axis=1),
+                #                            average='macro')
+                #print("\nprecision = %0.2f, recall = %0.2f, F1 = %0.2f, accuracy = %0.2f\n" % \
+                #      (report_lr[0], report_lr[1], report_lr[2], accuracy_score(y_test.argmax(axis=1),
+                #                    predictions.argmax(axis=1))))
+                #train_epochs = len(history.history['acc'])
+            	##########################################################################
                 from keras import backend as K
                 if K.backend() == 'tensorflow':
                     K.clear_session()
