@@ -1,4 +1,10 @@
 #!/home/giuseppe/.virtualenvs/dl4cv/bin/python3.5
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import MProblem as MP
+from platypus import NSGAII, Problem, Real,SMPSO
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
 from keras.models import *
 from keras.layers import *
 from keras.utils.vis_utils import plot_model
@@ -16,10 +22,8 @@ from sklearn.model_selection import train_test_split
 import csv
 from sklearn.metrics import classification_report, precision_recall_fscore_support, accuracy_score
 import copy
-
 from random import *
 from random import shuffle
-
 from platypus import *
 
 print(sys.version)
@@ -40,7 +44,7 @@ def getNumSamples(src):
 
     return sum, len(os.listdir(src))
 
-
+#Script
 class script(Problem):
         def __init__(self, name, base_x, base_y):
         						#0			1			2				3
@@ -103,8 +107,7 @@ class script(Problem):
                         elif(i==3): md.add(MaxPooling2D(pool_size=(solution.variables[8],solution.variables[8]), strides=solution.variables[9]))
                         elif(i==6): md.add(Dense(units=5,activation='sigmoid'))
             return md
-
-	def getSolucaoFinal(self,info):
+        def getSolucaoFinal(self,info):
                 return self.solucoes.get(info)
 
 
@@ -187,5 +190,48 @@ class script(Problem):
                 print("Salvando dados...")
                 row = solution.objectives
                 writeCSV('files.csv', row)
+
+#MAIN
+
+if __name__ == '__main__':
+    problem=MP.MProblem(name='Problem')
+    optimizer = NSGAII(problem, population_size=10)
+    num_generations = 1
+    # inicia o algoritmo
+    geracao=0
+    for i in range(num_generations):
+            # executa por uma geracao
+            geracao+=1
+            print("::::Geracao: ",geracao,"::::")
+            optimizer.run(1)
+
+    for solution in optimizer.result:
+            print(solution.objectives)
+
+    print("MEU PROBLEMA")
+    
+    problem2=scrpt.script(name='Problem',base_x=problem.getbaseX(),base_y=problem.getbaseY())
+    print("optimizer")
+    optimizer2= SMPSO(problem2,
+                 swarm_size = 5,
+                 leader_size = 5,
+                 generator = RandomGenerator(),
+                 mutation_probability = 0.1,
+                 mutation_perturbation = 0.5,
+                 max_iterations = 5,
+                 mutate = None)
+    num_generations=1
+    geracao=0
+    for i in range(num_generations):
+            # executa por uma geracao
+            geracao+=1
+            print("::::Geracao: ",geracao,"::::")
+            optimizer2.run(1)
+
+    print(">>>>>>>>>>>>>RESULT<<<<<<<<<<<<<<<")
+    val=(optimizer2.result)[0].objectives
+    print("Objective",val[0],val[1],val[2],val[3])
+    resp=problem2.getSolucaoFinal(val[0])
+    print("Config",resp)
 
                 
