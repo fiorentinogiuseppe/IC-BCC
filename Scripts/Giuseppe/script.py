@@ -61,7 +61,7 @@ class script(Problem):
                             Integer(1,6)]
 
                 variables = len(encoding)
-                objectives = 4
+                objectives = 1
                 super(script, self).__init__(variables, objectives)
                 self.types[:] = encoding
                 self.class_name = name
@@ -123,18 +123,18 @@ class script(Problem):
 
                 modelPadrao= self.DefaulttDNN()
 
-                #print(modelPadrao.summary())
+                print(modelPadrao.summary())
 
                 model=self.ModifieddDNN(numCamadasModf=solution.variables[15], model=modelPadrao,solution=solution)
 
-                #print(model.summary())
+                print(model.summary())
 
                 print("Compilando")
                 learning_rate = 0.1
                 decay_rate = learning_rate / self.epochs
                 momentum = 0.8
                 sgd = SGD(lr=learning_rate, momentum=momentum, decay=decay_rate, nesterov=False)
-                model.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy','precision','recall', 'f1'])
+                model.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy'])#,'precision','recall', 'f1'])
 
                 print("Iniciando treinamento")
                 earlyStopping = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10, verbose=1, mode='auto')
@@ -148,15 +148,15 @@ class script(Problem):
                	train_acc = history.history['acc'][-1]
                 val_acc = history.history['val_acc'][-1]
 		
-                train_recall = history.history['recall'][-1]
-                val_recall = history.history['val_recall'][-1]
+                #train_recall = history.history['recall'][-1]
+                #val_recall = history.history['val_recall'][-1]
 
 
-                train_precision = history.history['precision'][-1]
-                val_precision = history.history['val_precision'][-1]
+                ##train_precision = history.history['precision'][-1]
+                #val_precision = history.history['val_precision'][-1]
 
-                train_f1 = history.history['f1'][-1]
-                val_f1 = history.history['val_f1'][-1]
+                #train_f1 = history.history['f1'][-1]
+                #val_f1 = history.history['val_f1'][-1]
 
 		#metrics################################################################
                 #print('\n acc' , val_acc)
@@ -172,13 +172,14 @@ class script(Problem):
                 #                    predictions.argmax(axis=1))))
                 #train_epochs = len(history.history['acc'])
             	##########################################################################
+
                 from keras import backend as K
                 if K.backend() == 'tensorflow':
                     K.clear_session()
 
                 self.id += 1
 
-                solution.objectives[:] = [-val_acc,-val_precision ,-val_recall , -val_f1]#como o objectives la em cima ta 1 nao precisa do tempo
+                solution.objectives[:] = [-val_acc] # -val_precision ,-val_recall , -val_f1]como o objectives la em cima ta 1 nao precisa do tempo
 
                 variaveis=[]
                 print(solution.objectives)
@@ -210,7 +211,7 @@ if __name__ == '__main__':
 
     print("MEU PROBLEMA")
     
-    problem2=scrpt.script(name='Problem',base_x=problem.getbaseX(),base_y=problem.getbaseY())
+    problem2=script(name='Problem',base_x=problem.getbaseX(),base_y=problem.getbaseY())
     print("optimizer")
     optimizer2= SMPSO(problem2,
                  swarm_size = 5,
@@ -230,7 +231,7 @@ if __name__ == '__main__':
 
     print(">>>>>>>>>>>>>RESULT<<<<<<<<<<<<<<<")
     val=(optimizer2.result)[0].objectives
-    print("Objective",val[0],val[1],val[2],val[3])
+    print("Objective",val[0])
     resp=problem2.getSolucaoFinal(val[0])
     print("Config",resp)
 
