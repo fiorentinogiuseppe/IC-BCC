@@ -1,4 +1,3 @@
-#!/home/giuseppe/.virtualenvs/dl4cv/bin/python3.5
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import MProblem as MP
