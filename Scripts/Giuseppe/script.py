@@ -1,3 +1,4 @@
+#!/home/giuseppe/.virtualenvs/dl4cv/bin/python3.5
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import MProblem as MP
@@ -24,8 +25,40 @@ import copy
 from random import *
 from random import shuffle
 from platypus import *
+from keras.datasets import cifar10
+import keras
+from keras.datasets import fashion_mnist
+from keras.datasets import mnist
+
+
+
 
 print(sys.version)
+def configBase(x_train, y_train, x_test, y_test, img_rows, img_cols):
+      tamanho=x_train.shape
+      print(tamanho)
+      if(len(tamanho)==4):
+            # convert class vectors to binary class matrices
+            y_train = keras.utils.to_categorical(y_train, num_classes)
+            y_test = keras.utils.to_categorical(y_test, num_classes)
+            
+      elif(len(tamanho)==3):
+            x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+            x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+            input_shape = (img_rows, img_cols, 1)
+            x_train = x_train.astype('float32')
+            x_test = x_test.astype('float32')
+            x_train /= 255
+            x_test /= 255
+            
+            # convert class vectors to binary class matrices
+            y_train = keras.utils.to_categorical(y_train, num_classes)
+            y_test = keras.utils.to_categorical(y_test, num_classes)
+      else:
+            print("Tamanho estranho. Por favor coloque bases com shape de tamanha 3 ou 4")
+            print("Retornando None")
+            return None      
+      return x_train, y_train, x_test, y_test
 
 #Salvar em arquivos
 def writeCSV(nameFile, row):
@@ -46,18 +79,18 @@ def getNumSamples(src):
 #Script
 class script(Problem):
         def __init__(self, name, base_x, base_y):
-        						#0			1			2				3
+        		      #0	        1	    2		      3
                 encoding = [Integer(1,9), Integer(0,1), Integer(1,2), Integer(1,124),
-                				#4			5			6				7
-                			Integer(1,9), Integer(0,1), Integer(1,2), Integer(1,124),
-                				#8			9		
+                	      #4		5	    6		      7
+                	    Integer(1,9), Integer(0,1), Integer(1,2), Integer(1,124),
+                	      #8		9		
                             Integer(2,3), Integer(1,2), 
-                            	#10			11			12				13
+                              #10	        11	    12		      13
                             Integer(1,9), Integer(0,1), Integer(1,2), Integer(1,124),
-                            	#14
+                              #14
                             Integer(1,2),
-                            	#15
-                            Integer(1,6)]
+                              #15
+                            Integer(3,6)]
 
                 variables = len(encoding)
                 objectives = 1
@@ -72,9 +105,9 @@ class script(Problem):
                 self.epochs = 50#repeticoes
                 self.solucoes={}#dicionario de solucoes
                 self.id = 0
-                self.X_train=None;
+                self.X_train=None
 
-        def DefaulttDNN(self):
+        def DefaulttDNN(self,lencategories):
               print("Train Shape",self.X_train.shape[1:])
               model = Sequential()
               input1=random.randint(1,9)
@@ -91,10 +124,10 @@ class script(Problem):
               model.add(MaxPooling2D(pool_size=(pool,pool), strides=input4))
               model.add(Conv2D(filters=input5, kernel_size=input6,strides=input7, padding="same"))
               model.add(Flatten())
-              model.add(Dense(units=5, activation='sigmoid'))
+              model.add(Dense(units=lencategories, activation='softmax'))
               return model
 
-        def ModifieddDNN(self,numCamadasModf, model, solution):
+        def ModifieddDNN(self,numCamadasModf, model, solution, lencategories):
             print(solution)
             md=Sequential()
             for i in range(1,7,1):
@@ -104,7 +137,7 @@ class script(Problem):
                         if(i==1): md.add(Conv2D(filters=solution.variables[0], kernel_size=solution.variables[3], strides=solution.variables[2], padding="same",input_shape=self.X_train.shape[1:]))
                         elif(i==2 or i==4): md.add(Conv2D(filters=solution.variables[10], kernel_size=solution.variables[13], strides=solution.variables[12], padding="same"))
                         elif(i==3): md.add(MaxPooling2D(pool_size=(solution.variables[8],solution.variables[8]), strides=solution.variables[9]))
-                        elif(i==6): md.add(Dense(units=5,activation='sigmoid'))
+                        elif(i==6): md.add(Dense(units=lencategories,activation='softmax'))
             return md
         def getSolucaoFinal(self,info):
                 return self.solucoes.get(info)
@@ -120,11 +153,11 @@ class script(Problem):
 
                 self.X_train=X_train
 
-                modelPadrao= self.DefaulttDNN()
+                modelPadrao= self.DefaulttDNN(lencategories=10)#pensar num jeito de automatizar
 
                 print(modelPadrao.summary())
 
-                model=self.ModifieddDNN(numCamadasModf=solution.variables[15], model=modelPadrao,solution=solution)
+                model=self.ModifieddDNN(numCamadasModf=solution.variables[15], model=modelPadrao,solution=solution, lencategories=10)
 
                 print(model.summary())
 
@@ -194,6 +227,8 @@ class script(Problem):
 #MAIN
 
 if __name__ == '__main__':
+    '''
+    #Base Gestos
     problem=MP.MProblem(name='Problem')
     optimizer = NSGAII(problem, population_size=10)
     num_generations = 1
@@ -207,11 +242,92 @@ if __name__ == '__main__':
 
     for solution in optimizer.result:
             print(solution.objectives)
+   
+    #Base Mnist
+    # input image dimensions
+    img_rows, img_cols = 28, 28 #configuração manual a respeito da base
 
-    print("MEU PROBLEMA")
+    #output dimension
+    num_classes=10 #configuração manual a respeito da base
+
+    # the data, split between train and test sets
+    (x_train, y_train), (x_test, y_test)= mnist.load_data()
+    x_train, y_train, x_test, y_test= carregarBase(x_train, y_train, x_test, y_test, img_rows, img_cols)
     
-    problem2=script(name='Problem',base_x=problem.getbaseX(),base_y=problem.getbaseY())
-    print("optimizer")
+    #Shape (num_samples,28,28)
+
+    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+    input_shape = (img_rows, img_cols, 1)
+    x_train = x_train.astype('float32')
+    x_test = x_test.astype('float32')
+    x_train /= 255
+    x_test /= 255
+
+    # convert class vectors to binary class matrices
+    y_train = keras.utils.to_categorical(y_train, num_classes)
+    y_test = keras.utils.to_categorical(y_test, num_classes)
+    
+    #Base Fashion_Mnist 
+    # input image dimensions
+    img_rows, img_cols = 28, 28 #configuração manual a respeito da base
+
+    #output dimension
+    num_classes=10 #configuração manual a respeito da base
+
+    # the data, split between train and test sets
+    (x_train, y_train), (x_test, y_test) = fashion_mnist.load_data()
+    #Shape (num_samples,28,28)
+
+    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+    input_shape = (img_rows, img_cols, 1)
+    x_train = x_train.astype('float32')
+    x_test = x_test.astype('float32')
+    x_train /= 255
+    x_test /= 255
+
+    # convert class vectors to binary class matrices
+    y_train = keras.utils.to_categorical(y_train, num_classes)
+    y_test = keras.utils.to_categorical(y_test, num_classes)
+
+    
+    #Base Cifar10
+    
+    # input image dimensions
+    img_rows, img_cols = 32, 32
+
+    #output dimension
+    num_classes=10
+
+    # the data, split between train and test sets
+    (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+    #Shape (num_samples,3,32,32)
+
+
+    # convert class vectors to binary class matrices
+    y_train = keras.utils.to_categorical(y_train, num_classes)
+    y_test = keras.utils.to_categorical(y_test, num_classes)
+    '''
+    print("Configuração da Base")
+    # input image dimensions
+    img_rows, img_cols = 28, 28 #configuração manual a respeito da base que sera carregada (tamanho de cada imagem)
+
+    #output dimension
+    num_classes=10 #configuração manual a respeito da base que sera carregada (quantas classes tem a base)
+
+    print("Carregando Base")
+    #Load DB
+    (x_train, y_train), (x_test, y_test)= mnist.load_data()
+
+    print("Configurando Base")
+    x_train, y_train, x_test, y_test= configBase(x_train, y_train, x_test, y_test, img_rows, img_cols)
+
+    print("Configurando Problem")
+    #problem2=script(name='Problem',base_x=problem.getbaseX(),base_y=problem.getbaseY()) #Usar qndo for testar a base de gestos
+    problem2=script(name='Problem',base_x=x_train,base_y=y_train) #Qualquer outra base usar esse
+    
+    print("Configurando Otimizador")
     optimizer2= SMPSO(problem2,
                  swarm_size = 5,
                  leader_size = 5,
@@ -220,6 +336,8 @@ if __name__ == '__main__':
                  mutation_perturbation = 0.5,
                  max_iterations = 5,
                  mutate = None)
+
+    print("Rodando o codigo")
     num_generations=1
     geracao=0
     for i in range(num_generations):
