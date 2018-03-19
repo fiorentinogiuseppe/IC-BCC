@@ -139,14 +139,14 @@ class script(Problem):
                             Integer(3,6)]
 
                 variables = len(encoding)
-                objectives = 1
+                objectives = 2
                 super(script, self).__init__(variables, objectives)
                 self.types[:] = encoding
                 self.class_name = name
                 self.base_x=base_x
                 self.base_y=base_y
 
-                self.batch_size = 28#de quanto em quanto vai caminhar
+                self.batch_size = 200#de quanto em quanto vai caminhar
                 self.num_classes = 3
                 self.epochs = 50#repeticoes
                 self.solucoes={}#dicionario de solucoes
@@ -251,13 +251,30 @@ class script(Problem):
                 #train_epochs = len(history.history['acc'])
             	##########################################################################
 
+        	train_epochs = len(history.history['acc'])
+
+        	start = time.time()
+
+        	# Testa
+        	test_scores = model.evaluate(X_test, y_test, verbose=0)
+
+		end = time.time()
+		test_ms = round((end - start) * 1000, 1)
+		print("Test time: ", test_ms, " ms")
+
+		test_acc = test_scores[1]
+		print('Test accuracy:', test_acc)
+
+        
                 from keras import backend as K
                 if K.backend() == 'tensorflow':
                     K.clear_session()
 
                 self.id += 1
 
-                solution.objectives[:] = [-val_acc] # -val_precision ,-val_recall , -val_f1]como o objectives la em cima ta 1 nao precisa do tempo
+                #solution.objectives[:] = [-val_acc] # -val_precision ,-val_recall , -val_f1]como o objectives la em cima ta 1 nao precisa do tempo
+		# retorna os objetivos (acuracia e tempo
+        	solution.objectives[:] = [-val_acc, test_ms]
 
                 variaveis=[]
                 print(solution.objectives)
@@ -383,11 +400,11 @@ if __name__ == '__main__':
                  generator = RandomGenerator(),
                  mutation_probability = 0.1,
                  mutation_perturbation = 0.5,
-                 max_iterations = 5,
+                 max_iterations = 10,
                  mutate = None)
 
     print("Rodando o codigo")
-    num_generations=1
+    num_generations=5
     geracao=0
     for i in range(num_generations):
             # executa por uma geracao
