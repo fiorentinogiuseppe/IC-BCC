@@ -131,28 +131,37 @@ def RandomDNN(gera, input_shape):
 
 
 def ModifiedDNN(numCamadasModf, model, input_shape):
-    input1 = random.randint(1, 9)
-    input2 = random.randint(1, 1024)
-    input3 = random.randint(1, 2)
-    input4 = random.randint(1, 2)
-    input5 = random.randint(1, 9)
-    input6 = random.randint(1, 1024)
-    input7 = random.randint(1, 2)
-    pool = random.randint(2, 3)
+    #CONV2D
+    input0 = random.randint(1, 9)	
+    input1 = random.randint(0, 1)	
+    input2 = random.randint(1, 2)	
+    input3 = random.randint(1, 1024)
+    #MoxPooling2D
+    input4 = random.randint(1, 9)	
+    input5 = random.randint(0, 1)
+    #CONV2D
+    input6 = random.randint(1, 2)	
+    input7 = random.randint(1, 1024)
+    input8 = random.randint(2, 3)
+    input9 = random.randint(1, 2)
+    #CONV2D
+    input10 = random.randint(1, 9)	
+    input11 = random.randint(0, 1)	
+    input12 = random.randint(1, 2)	
+    input13 = random.randint(1, 1024)
+    #DENSE
+    input14 = random.randint(1, 2)	
 
     md = Sequential()
     for i in range(1, 7, 1):
         if (i < numCamadasModf or i == 5):
             md.add(model.get_layer(None, i))
         else:
-            if (i == 1): md.add(
-                Conv2D(filters=input1, kernel_size=input2, strides=input3, padding="same", input_shape=input_shape))
-            if (i == 4):
-                md.add(Conv2D(filters=input5, kernel_size=input5, strides=input6, padding="same"))
-            elif (i == 3):
-                md.add(MaxPooling2D(pool_size=(pool, pool), strides=input7))
-            elif (i == 6):
-                md.add(Dense(units=5, activation='softmax'))
+            if (i == 1): md.add(Conv2D(filters=input0, kernel_size=input3, strides=input2, padding="same", input_shape=input_shape))
+	    elif(i==2): md.add(Conv2D(filters=input4, kernel_size=input7, strides=input6, padding="same"))
+            elif (i == 3): md.add(MaxPooling2D(pool_size=(input8, input8), strides=input9))
+	    elif (i == 4): md.add(Conv2D(filters=input10, kernel_size=input13, strides=input12, padding="same"))
+            elif (i == 6): md.add(Dense(units=5, activation='softmax'))
     return md
 
 
