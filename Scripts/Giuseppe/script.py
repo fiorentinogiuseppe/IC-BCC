@@ -213,21 +213,17 @@ def getNumSamples(src):
 #Script
 class script(Problem):
         def __init__(self, name, base_x, base_y, lencategories):
-        		      #0	        1	    2		      3
-                encoding = [Integer(1,9), Integer(0,1), Integer(1,2), Integer(1,124),
-                	      #4		5	    6		      7
-                	    Integer(1,9), Integer(0,1), Integer(1,2), Integer(1,124),
-                	      #8		9		
-                            Integer(2,3), Integer(1,2), 
-                              #10	        11	    12		      13
+        		      #0	        1	    
+                encoding = [ Integer(2,3), Integer(1,2), 
+                              #2	        3	    4		      5
                             Integer(1,9), Integer(0,1), Integer(1,2), Integer(1,124),
-                              #14
+                              #6
                             Integer(1,2),
-                              #15
+                              #7
                             Integer(3,6)]
 
                 variables = len(encoding)
-                objectives = 1
+                objectives = 2
                 super(script, self).__init__(variables, objectives)
                 self.types[:] = encoding
                 self.class_name = name
@@ -243,26 +239,28 @@ class script(Problem):
 
         def DefaulttDNN(self,input_shape,lencategories):
               model = Sequential()
-	      model.add(Conv2D(filters=5, kernel_size=4, input_shape=input_shape))
-	      model.add(Conv2D(filters=5, kernel_size=4))
-	      model.add(MaxPooling2D())
-	      model.add(Conv2D(filters=5, kernel_size=4))
-	      model.add(Flatten())
-	      model.add(Dense(units=5))
+              model.add(Conv2D(filters=5, kernel_size=4,padding="same", input_shape=input_shape))
+              model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
+              model.add(MaxPooling2D())
+              model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
+              model.add(Flatten())
+              model.add(Dense(units=5))
               return model
 
         def ModifieddDNN(self,numCamadasModf, model, solution, lencategories, input_shape):
-            print(solution)
             md=Sequential()
             for i in range(1,7,1):
-                  if(i<numCamadasModf or i==5):
-                        md.add(model.get_layer(None,i))
+                  if(i<numCamadasModf or i==5 or i==1 or i==2):
+                      print("menor ou 5")
+                      print(model.get_layer(None,i))
+                      md.add(model.get_layer(None,i))
                   else:
-                        if(i==1): md.add(Conv2D(filters=solution.variables[0], kernel_size=solution.variables[3], strides=solution.variables[2], padding="same",input_shape=input_shape))
-                        elif(i==2): md.add(Conv2D(filters=solution.variables[4], kernel_size=solution.variables[7], strides=solution.variables[6], padding="same"))
-                        elif(i==3): md.add(MaxPooling2D(pool_size=(solution.variables[8],solution.variables[8]), strides=solution.variables[9]))
-                        elif(i==4): md.add(Conv2D(filters=solution.variables[10], kernel_size=solution.variables[13], strides=solution.variables[12], padding="same"))
-                        elif(i==6): md.add(Dense(units=self.lencategories,activation='softmax'))
+                      if(i==3):
+                            md.add(MaxPooling2D(pool_size=(solution.variables[0],solution.variables[0]), strides=solution.variables[1]))
+                      elif(i==4):
+                            md.add(Conv2D(filters=solution.variables[2], kernel_size=solution.variables[5], strides=solution.variables[4], padding="same"))
+                      elif(i==6):
+                            md.add(Dense(units=self.lencategories,activation='softmax'))       
             return md
         def getSolucaoFinal(self,info):
                 return self.solucoes.get(info)
@@ -282,7 +280,7 @@ class script(Problem):
 
                 print(modelPadrao.summary())
 
-                model=self.ModifieddDNN(numCamadasModf=solution.variables[15], model=modelPadrao,solution=solution, lencategories=5, input_shape=self.X_train.shape[1:])
+                model=self.ModifieddDNN(numCamadasModf=solution.variables[7], model=modelPadrao,solution=solution, lencategories=5, input_shape=self.X_train.shape[1:])
 
                 print(model.summary())
 
@@ -295,6 +293,7 @@ class script(Problem):
 
                 print("Iniciando treinamento")
                 earlyStopping = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10, verbose=1, mode='auto')
+                print(X_train.shape)
                 history=model.fit(X_train,y_train,batch_size=self.batch_size,
                         epochs=self.epochs,
                         callbacks=[earlyStopping],
@@ -321,13 +320,13 @@ class script(Problem):
 
                 #print(classification_report(y_test.argmax(axis=1),
                 #                    predictions.argmax(axis=1)))
-                #report_lr = precision_recall_fscore_support(y_test.argmax(axis=1),
-                #                    predictions.argmax(axis=1),
-                #                            average='macro')
-                #print("\nprecision = %0.2f, recall = %0.2f, F1 = %0.2f, accuracy = %0.2f\n" % \
-                #      (report_lr[0], report_lr[1], report_lr[2], accuracy_score(y_test.argmax(axis=1),
-                #                    predictions.argmax(axis=1))))
-                #train_epochs = len(history.history['acc'])
+                report_lr = precision_recall_fscore_support(y_test.argmax(axis=1),
+                                   predictions.argmax(axis=1),
+                                            average='macro')
+                print("\nprecision = %0.2f, recall = %0.2f, F1 = %0.2f, accuracy = %0.2f\n" % \
+                      (report_lr[0], report_lr[1], report_lr[2], accuracy_score(y_test.argmax(axis=1),
+                                    predictions.argmax(axis=1))))
+                train_epochs = len(history.history['acc'])
             	##########################################################################
 
                 from keras import backend as K
@@ -336,7 +335,7 @@ class script(Problem):
 
                 self.id += 1
 
-                solution.objectives[:] = [-val_acc] # -val_precision ,-val_recall , -val_f1]como o objectives la em cima ta 1 nao precisa do tempo
+                solution.objectives[:] = [-val_acc,- report_lr[2]] 
 
                 variaveis=[]
                 print(solution.objectives)
@@ -370,7 +369,6 @@ if __name__ == '__main__':
     options_im_size = [16, 32, 48, 64]
     im_sz=random.randint(0,3)
     img_width, img_height = options_im_size[im_sz], options_im_size[im_sz]
-
     print('Rescaling database to', img_width, 'x', img_height, ' pixels')
     base_x, base_y = array_from_dir(data_dir=pasta_base, nb_samples=nb_db_samples,
                                         nb_classes=num_classes, width=img_width, height=img_height)
