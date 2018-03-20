@@ -235,7 +235,7 @@ class script(Problem):
                 self.base_y=base_y
                 self.nb_db_samples, self.num_classes = getNumSamples(pasta_base)
 
-                self.batch_size = 28#de quanto em quanto vai caminhar
+                self.batch_size = 200#de quanto em quanto vai caminhar
                 self.epochs = 50#repeticoes
                 self.solucoes={}#dicionario de solucoes
                 self.id = 0
@@ -247,6 +247,7 @@ class script(Problem):
 	      model.add(Conv2D(filters=5, kernel_size=4))
 	      model.add(MaxPooling2D())
 	      model.add(Conv2D(filters=5, kernel_size=4))
+	      model.add(Flatten())
 	      model.add(Dense(units=5))
               return model
 
