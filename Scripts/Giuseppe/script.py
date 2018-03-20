@@ -483,4 +483,3 @@ if __name__ == '__main__':
     print("Objective",val[0])
     resp=problem2.getSolucaoFinal(val[0])
     print("Config",resp)
-
