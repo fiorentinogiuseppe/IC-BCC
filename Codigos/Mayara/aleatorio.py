@@ -105,23 +105,12 @@ def writeCSV(nameFile, row):
     fileCSV.writerow(row)
 
 
-def RandomDNN(gera, input_shape):
+def DefaultDNN(gera, input_shape):
     model = Sequential()
-    input1 = random.randint(1, 9)
-    input2 = random.randint(1, 124)
-    input3 = random.randint(1, 2)
-    input4 = random.randint(1, 2)
-    input5 = random.randint(1, 9)
-    input6 = random.randint(1, 124)
-    input7 = random.randint(1, 2)
-
-    model.add(Conv2D(filters=input1, kernel_size=input2, strides=input3, padding="same", input_shape=input_shape))
-    model.add(Conv2D(filters=input1, kernel_size=input2, strides=input3, padding="same"))
-
-    pool = random.randint(2, 3)
-
-    model.add(MaxPooling2D(pool_size=(pool, pool), strides=input4))
-    model.add(Conv2D(filters=input5, kernel_size=input6, strides=input7, padding="same"))
+    model.add(Conv2D(filters=5, kernel_size=4, padding="same", input_shape=input_shape))
+    model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
+    model.add(MaxPooling2D(pool_size=[2, 2], strides=2))
+    model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
     model.add(Flatten())
     model.add(Dense(units=5, activation='softmax'))
 
@@ -131,37 +120,40 @@ def RandomDNN(gera, input_shape):
 
 
 def ModifiedDNN(numCamadasModf, model, input_shape):
-    #CONV2D
-    input0 = random.randint(1, 9)	
-    input1 = random.randint(0, 1)	
-    input2 = random.randint(1, 2)	
+    # CONV2D
+    input0 = random.randint(1, 9)
+    input1 = random.randint(0, 1)
+    input2 = random.randint(1, 2)
     input3 = random.randint(1, 1024)
-    #MoxPooling2D
-    input4 = random.randint(1, 9)	
+    # MoxPooling2D
+    input4 = random.randint(1, 9)
     input5 = random.randint(0, 1)
-    #CONV2D
-    input6 = random.randint(1, 2)	
+    # CONV2D
+    input6 = random.randint(1, 2)
     input7 = random.randint(1, 1024)
     input8 = random.randint(2, 3)
     input9 = random.randint(1, 2)
-    #CONV2D
-    input10 = random.randint(1, 9)	
-    input11 = random.randint(0, 1)	
-    input12 = random.randint(1, 2)	
+    # CONV2D
+    input10 = random.randint(1, 9)
+    input11 = random.randint(0, 1)
+    input12 = random.randint(1, 2)
     input13 = random.randint(1, 1024)
-    #DENSE
-    input14 = random.randint(1, 2)	
+    # DENSE
+    input14 = random.randint(1, 2)
 
     md = Sequential()
     for i in range(1, 7, 1):
         if (i < numCamadasModf or i == 5):
             md.add(model.get_layer(None, i))
         else:
-            if (i == 1): md.add(Conv2D(filters=input0, kernel_size=input3, strides=input2, padding="same", input_shape=input_shape))
-	    elif(i==2): md.add(Conv2D(filters=input4, kernel_size=input7, strides=input6, padding="same"))
+            if (i == 1): md.add(
+                Conv2D(filters=input0, kernel_size=input3, strides=input2, padding="same", input_shape=input_shape))
+            elif (i == 2): md.add(Conv2D(filters=input4, kernel_size=input7, strides=input6, padding="same"))
             elif (i == 3): md.add(MaxPooling2D(pool_size=(input8, input8), strides=input9))
-	    elif (i == 4): md.add(Conv2D(filters=input10, kernel_size=input13, strides=input12, padding="same"))
+            elif (i == 4): md.add(Conv2D(filters=input10, kernel_size=input13, strides=input12, padding="same"))
             elif (i == 6): md.add(Dense(units=5, activation='softmax'))
+
+
     return md
 
 
@@ -304,28 +296,32 @@ base_x, base_y = array_from_dir(data_dir=pasta_base, nb_samples=nb_db_samples,
 
         # 3) Separa aleatoriamente em treinamento (60%), validação (20%) e teste (20%)
 x_train, y_train, x_test, y_test, X_val, Y_val = split_dataset_random(base_x, base_y, 0.6, 0.2)
-
+from sklearn.metrics import precision_recall_fscore_support, classification_report
 soma =0
+soma_fm = 0
 soma_t = 0
-for i in range(10):
+num= 30
+for i in range(num):
     print(i)
     start = time.time()
-    model = RandomDNN(i, x_train.shape[1:])
+    model = DefaultDNN(i, x_train.shape[1:])
 
 
 
     md = ModifiedDNN(random.randint(3, 6), model, x_train.shape[1:])
 
+    learning_rate = 0.1
+    epochs = 50
+    decay_rate = learning_rate / epochs
+    momentum = 0.8
+    sgd = SGD(lr=learning_rate, momentum=momentum, decay=decay_rate, nesterov=False)
+    md.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy'])
 
-
-    model.compile(optimizer='rmsprop',
-                  loss='categorical_crossentropy',
-                  metrics=['accuracy'])
     earlyStopping = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10, verbose=1, mode='auto')
-    history = model.fit(x_test, y_test, batch_size=200,
+    history = md.fit(x_test, y_test, batch_size=200,
                         epochs=50,
                         callbacks=[earlyStopping],
-                        validation_split=0.33,
+                        validation_data=[X_val, Y_val],
                         shuffle=True,
                         verbose=2)
 
@@ -339,9 +335,26 @@ for i in range(10):
     print(i,val_acc)
     print("tmp ",  tmp)
     soma = soma + val_acc
+##metrics
 
 
-print("Media acuracia ", soma/10, "i ", i)
-print("Media tmpo ", soma_t/10 , "i ", i)
+    predictions = model.predict(x_test, batch_size=batch_size)
+    print(classification_report(y_test.argmax(axis=1),
+            predictions.argmax(axis=1)))
+    report_lr = precision_recall_fscore_support(y_test.argmax(axis=1),
+                                        predictions.argmax(axis=1),
+                                                average='macro')
+
+
+
+    print("\nprecision = %0.2f, recall = %0.2f, F1 = %0.2f\n" % \
+              (report_lr[0], report_lr[1], report_lr[2]))
+
+    soma_fm = soma_fm + report_lr[2]
+    print("fm", report_lr[2])
+
+print("Media acuracia ", soma/num, "i ", i)
+print("Media tmpo ",  soma_t/num , "i ", i)
+print("Media fm ", soma_fm/num , "i ", i)
 
 #print("Dicionarios de config", config)
