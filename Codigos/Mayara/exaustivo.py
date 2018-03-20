@@ -20,6 +20,7 @@ from keras.datasets import mnist
 from scipy.misc import imread, imresize
 from sklearn.model_selection import train_test_split
 from glob import glob
+from sklearn.metrics import  precision_recall_fscore_support
 
 configs = {}  # dicionario de resultados config  "results.update({'config1': 'resultado'})
 melhoracc = None
@@ -32,72 +33,6 @@ A = [range(1, 10), range(0, 2), range(1, 3), range(1, 125),  # Conv2D remover
      range(1, 7)]  # Numero de camadas Modificadas
 
 
-def load_notmnist(path='./notMNIST_small', letters='ABCDEFGHIJ',
-                  img_shape=(28, 28), test_size=0.25, one_hot=False):
-    # download data if it's missing. If you have any problems, go to the urls and load it manually.
-    if not os.path.exists(path):
-        print("Downloading data...")
-        assert os.system(
-            'curl http://yaroslavvb.com/upload/notMNIST/notMNIST_small.tar.gz > notMNIST_small.tar.gz') == 0
-        print("Extracting ...")
-        assert os.system('tar -zxvf notMNIST_small.tar.gz > untar_notmnist.log') == 0
-
-    data, labels = [], []
-    print("Parsing...")
-    for img_path in glob(os.path.join(path, '*/*')):
-        class_i = img_path.split('/')[-2]
-        if class_i not in letters: continue
-        try:
-            data.append(imresize(imread(img_path), img_shape))
-            labels.append(class_i, )
-        except:
-            print("found broken img: %s [it's ok if <10 images are broken]" % img_path)
-
-    data = np.stack(data)[:, None].astype('float32')
-    data = (data - np.mean(data)) / np.std(data)
-
-    # convert classes to ints
-    letter_to_i = {l: i for i, l in enumerate(letters)}
-    labels = np.array(list(map(letter_to_i.get, labels)))
-
-    if one_hot:
-        labels = (np.arange(np.max(labels) + 1)[None, :] == labels[:, None]).astype('float32')
-
-    # split into train/test
-    X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=test_size, random_state=42)
-    X_train = X_train.reshape(X_train.shape[0], X_train.shape[2], X_train.shape[3], 1)
-    X_test = X_test.reshape(X_test.shape[0], X_test.shape[2], X_test.shape[3], 1)
-
-    print("Done")
-    return X_train, y_train, X_test, y_test
-
-
-def configBase(x_train, y_train, x_test, y_test, img_rows, img_cols):
-    tamanho = x_train.shape
-    print(tamanho)
-    if (len(tamanho) == 4):
-        # convert class vectors to binary class matrices
-        y_train = keras.utils.to_categorical(y_train, num_classes)
-        y_test = keras.utils.to_categorical(y_test, num_classes)
-
-    elif (len(tamanho) == 3):
-        x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
-        x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
-        input_shape = (img_rows, img_cols, 1)
-        x_train = x_train.astype('float32')
-        x_test = x_test.astype('float32')
-        x_train /= 255
-        x_test /= 255
-
-        # convert class vectors to binary class matrices
-        y_train = keras.utils.to_categorical(y_train, num_classes)
-        y_test = keras.utils.to_categorical(y_test, num_classes)
-    else:
-        print("Tamanho estranho. Por favor coloque bases com shape de tamanha 3 ou 4")
-        print("Retornando None")
-        return None
-    return x_train, y_train, x_test, y_test
-
 
 # Salvar em arquivos
 def writeCSV(nameFile, row):
@@ -105,23 +40,12 @@ def writeCSV(nameFile, row):
     fileCSV.writerow(row)
 
 
-def RandomDNN(gera, input_shape):
+def DefaultDNN(gera, input_shape):
     model = Sequential()
-    input1 = random.randint(1, 9)
-    input2 = random.randint(1, 124)
-    input3 = random.randint(1, 2)
-    input4 = random.randint(1, 2)
-    input5 = random.randint(1, 9)
-    input6 = random.randint(1, 124)
-    input7 = random.randint(1, 2)
-
-    model.add(Conv2D(filters=input1, kernel_size=input2, strides=input3, padding="same", input_shape=input_shape))
-    model.add(Conv2D(filters=input1, kernel_size=input2, strides=input3, padding="same"))
-
-    pool = random.randint(2, 3)
-
-    model.add(MaxPooling2D(pool_size=(pool, pool), strides=input4))
-    model.add(Conv2D(filters=input5, kernel_size=input6, strides=input7, padding="same"))
+    model.add(Conv2D(filters=5, kernel_size=4, padding="same", input_shape=input_shape))
+    model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
+    model.add(MaxPooling2D(pool_size=[2, 2], strides=2))
+    model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
     model.add(Flatten())
     model.add(Dense(units=5, activation='softmax'))
 
@@ -131,14 +55,6 @@ def RandomDNN(gera, input_shape):
 
 
 def ModifiedDNN(numCamadasModf, model, input_shape):
-    input1 = random.randint(1, 9)
-    input2 = random.randint(1, 124)
-    input3 = random.randint(1, 2)
-    input4 = random.randint(1, 2)
-    input5 = random.randint(1, 9)
-    input6 = random.randint(1, 124)
-    input7 = random.randint(1, 2)
-    pool = random.randint(2, 3)
 
     md = Sequential()
     for i in range(1, 7, 1):
@@ -275,7 +191,9 @@ x_train, y_train, x_test, y_test, X_val, Y_val = split_dataset_random(base_x, ba
 
 # inicia o algoritmo
 
-m_val=0
+val=0
+fm = 0
+mdia=0
 start = time.time()
 for j in range(2, 3):
     for k in range(1, 2):
@@ -286,31 +204,44 @@ for j in range(2, 3):
                         for p in range(1, 2):
                             for s in range(3, 6):
                                 print("Compilando")
-                                model = RandomDNN(1, x_train.shape[1:])
+                                model = DefaultDNN(1, x_train.shape[1:])
 
                                 md = ModifiedDNN(s, model, x_train.shape[1:])
 
-                                model.compile(optimizer='rmsprop',
+                                md.compile(optimizer='rmsprop',
                                               loss='categorical_crossentropy',
                                               metrics=['accuracy'])
                                 earlyStopping = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10,
                                                               verbose=1, mode='auto')
-                                history = model.fit(x_test, y_test, batch_size=200,
+                                history = md.fit(x_test, y_test, batch_size=200,
                                                     epochs=50,
                                                     callbacks=[earlyStopping],
-                                                    validation_split=0.33,
+                                                    validation_data=[X_val, Y_val],
                                                     shuffle=True,
                                                     verbose=2)
 
                                 train_acc = history.history['acc'][-1]
                                 val_acc = history.history['val_acc'][-1]
 
-                                print("val ", val_acc)
-                                if(m_val < val_acc):
-                                    m_val = val_acc
+                                predictions = model.predict(x_test, batch_size=batch_size)
+
+                                report_lr = precision_recall_fscore_support(y_test.argmax(axis=1),
+                                                                            predictions.argmax(axis=1),
+                                                                            average='macro')
+
+                                #print("val ", (val_acc+ report_lr[2])/2)
+                                if(mdia < (val_acc+ report_lr[2])/2):
+                                    val= val_acc
+                                    fm = report_lr[2]
+                                    mdia = (val_acc + report_lr[2])/2
+
 
 
 end = time.time()
 tmp = round((end - start), 2)
-print("mlho val : ", m_val)
+print("mlho val : ", val)
+print("mlho fm : ", fm)
+
+print("Tmp : ", tmp)
+
 
