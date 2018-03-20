@@ -1,43 +1,26 @@
-from __future__ import print_function
-
-
-from keras.layers import Dense, Activation
-
-from sklearn.metrics import classification_report, precision_recall_fscore_support, accuracy_score
-
-from keras.models import *
-
-from keras.callbacks import EarlyStopping
-from keras.utils import to_categorical
-
-import matplotlib.pyplot as plt
-import os
-import numpy as np
-import cv2
-import progressbar
-
-from random import shuffle
-from Platypus.platypus import *
-
-print(sys.version)
-
 
 from keras.models import *
 from keras.layers import *
-from keras.utils.vis_utils import plot_model
 from keras.callbacks import EarlyStopping
 from keras.utils import to_categorical
 from keras.optimizers import SGD
-import matplotlib.pyplot as plt
-import os
-import numpy as np
+
 import cv2
 import progressbar
-
+import csv
+from sklearn.metrics import classification_report, precision_recall_fscore_support, accuracy_score
 from random import shuffle
-from Platypus.platypus import *
+from platypus import *
+import keras
+import os
+import numpy as np
+from scipy.misc import imread, imresize
+from sklearn.model_selection import train_test_split
+from glob import glob
 
 print(sys.version)
+
+
 # Retorna quantidade de imagens em diretorio
 def getNumSamples(src):
     sum = 0
@@ -129,58 +112,84 @@ def split_dataset_random(b_x, b_y, p_train, p_val):
     return x_tr, y_tr, x_te, y_te, x_val, y_val
 
 
-# indica pasta da base de dados, uma pasta com imagens para cada classe
-pasta_base = 'Gestures/'
-
-# tamanho do batch de treinamento
-batch_size = 200
-
-nb_db_samples, num_classes = getNumSamples(pasta_base)
-
-print('Base tem ', nb_db_samples, ' imagens e ', num_classes, ' classes')
+# Salvar em arquivos
+def writeCSV(nameFile, row):
+    fileCSV = csv.writer(open(nameFile, "a"))
+    fileCSV.writerow(row)
 
 
-class DnnProblem(Problem):
-    def __init__(self, name):
-        # nao vai de 0 a 9
-        encoding = [
-                    Integer(1, 9), Integer(1, 2), Integer(1, 2), Integer(1, 1024),
-                    Integer(1, 9), Integer(1, 2), Integer(1, 2), Integer(1, 1024),
-                    Integer(2, 3), Integer(1, 2),
-                    Integer(1, 9), Integer(1, 2), Integer(1, 2), Integer(1, 1024),
+# Retorna quantidade de imagens em diretorio
+def getNumSamples(src):
+    sum = 0
+    for cl in os.listdir(src):
+        class_dir = os.path.join(src, cl)
+        files = os.listdir(class_dir)
+        l = len(files)
+        sum += l
+
+    return sum, len(os.listdir(src))
+
+
+# Script
+class script(Problem):
+    def __init__(self, name, base_x, base_y, lencategories):
+        # 0	        1
+        encoding = [Integer(2, 3), Integer(1, 2),
+                    # 2	        3	    4		      5
+                    Integer(1, 9), Integer(0, 1), Integer(1, 2), Integer(1, 124),
+                    # 6
                     Integer(1, 2),
-                    Integer(3, 5)]
+                    # 7
+                    Integer(3, 6)]
+
         variables = len(encoding)
-        objectives = 1
-        super(DnnProblem, self).__init__(variables, objectives)
+        objectives = 2
+        super(script, self).__init__(variables, objectives)
         self.types[:] = encoding
         self.class_name = name
+        self.base_x = base_x
+        self.base_y = base_y
+        self.nb_db_samples, self.num_classes = getNumSamples(pasta_base)
 
-        self.batch_size = 28  # de quanto em quanto vai caminhar
-        self.num_classes = 3
-        self.epochs = 2  # repeticoes
+        self.batch_size = 200  # de quanto em quanto vai caminhar
+        self.epochs = 50  # repeticoes
         self.solucoes = {}  # dicionario de solucoes
         self.id = 0
+        self.lencategories = lencategories
 
+    def DefaulttDNN(self, input_shape, lencategories):
+        model = Sequential()
+        model.add(Conv2D(filters=5, kernel_size=4, padding="same", input_shape=input_shape))
+        model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
+        model.add(MaxPooling2D(pool_size=[2, 2], strides=2))
+        model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
+        model.add(Flatten())
+        model.add(Dense(units=5, activation='softmax'))
+        return model
 
-
-    def getSolucoes(self):
-        return self.solucoes
+    def ModifieddDNN(self, numCamadasModf, model, solution, lencategories, input_shape):
+        md = Sequential()
+        for i in range(1, 7, 1):
+            if (i < numCamadasModf or i == 5 or i == 1 or i == 2):
+                md.add(model.get_layer(None, i))
+            else:
+                if (i == 3):
+                    md.add(MaxPooling2D(pool_size=(solution.variables[0], solution.variables[0]),
+                                        strides=solution.variables[1]))
+                elif (i == 4):
+                    md.add(Conv2D(filters=solution.variables[2], kernel_size=solution.variables[5],
+                                  strides=solution.variables[4], padding="same"))
+                elif (i == 6):
+                    md.add(Dense(units=self.lencategories, activation='softmax'))
+        return md
 
     def getSolucaoFinal(self, info):
         return self.solucoes.get(info)
 
     def evaluate(self, solution):
-        n_camadas_mudar = solution.variables[15]
-        print(n_camadas_mudar," foram modificadas")
-        print(solution)
 
-        # 1) Decodifica o cromossomo
-
-        # tamanho da imagem
-        ##im_sz = sum(2 ** i * b for i, b in enumerate(bina[random.randint(0,4)], bina[random.randint(0,4)]))
         options_im_size = [16, 32, 48, 64]
-        im_sz=random.randint(0,3)
+        im_sz = random.randint(0, 3)
         img_width, img_height = options_im_size[im_sz], options_im_size[im_sz]
 
         # 2) Carrega a base de dados
@@ -189,130 +198,59 @@ class DnnProblem(Problem):
                                         nb_classes=num_classes, width=img_width, height=img_height)
 
         # 3) Separa aleatoriamente em treinamento (60%), validação (20%) e teste (20%)
-        X_tr, Y_tr, X_te, Y_te, X_val, Y_val = split_dataset_random(base_x, base_y, 0.6, 0.2)
+        X_train, y_train, X_test, y_test, X_val, Y_val = split_dataset_random(base_x, base_y, 0.6, 0.2)
 
-        # 4) Cria e testa o modelo
+
+
         print("Criando o modelo")
 
-        image1_input = Input(shape=(X_tr[0].shape[0], X_tr[0].shape[1], 1))
-        # conv11 = Conv2D(name="CONV_1", filters=solution.variables[1],
-        #                 kernel_size=3,
-        #                 strides=(2,2),
-        #                 activation='relu')(image1_input)
-        #
-        # conv12 = Conv2D(name="CONV_2",  filters=solution.variables[1],
-        #                 kernel_size=3,
-        #                 strides=(2,2),
-        #                 activation='relu')(conv11)
-        #
-        # conv12 = MaxPooling2D(pool_size=(2,2))(conv12)
-        #
-        # conv12 = Conv2D(name="CONV_3", filters=solution.variables[1],
-        #                 kernel_size=3,
-        #                 strides=(2,2),
-        #                 activation='relu')(conv12)
-        # dense1 = Flatten()(conv12)
-        #
-        # dense1 = Dense(name="DENSE_1", units=50,
-        #                activation='sigmoid')(dense1)
-        #
-        # out = Dense(name="DENSE_OUT", units=num_classes, activation='sigmoid')(dense1)
-        #
-        # model = Model(image1_input, outputs=out)
+        self.X_train = X_train
 
-        model = Sequential()
-        print("fase 1")
-        model.add(Conv2D(filters=solution.variables[0],  # se filters 0 da erro
-                         kernel_size=solution.variables[3],  # era 3
-                         strides=solution.variables[2],  # era 1
-                         padding="same",
-                         input_shape=X_tr.shape[1:]
-                         ))
-        print("fase 2")
-        print("fase 2")
+        modelPadrao = self.DefaulttDNN(input_shape=self.X_train.shape[1:],
+                                       lencategories=5)
+
+        print(modelPadrao.summary())
+
+        model = self.ModifieddDNN(numCamadasModf=solution.variables[7], model=modelPadrao, solution=solution,
+                                  lencategories=5, input_shape=self.X_train.shape[1:])
+
         print(model.summary())
-        model.add(MaxPooling2D(pool_size=(solution.variables[4], solution.variables[4]),
-                               strides=solution.variables[5]))  # era 1
-        print("fase 3")
-        model.add(Flatten())
-        model.add(Dense(units=5  # numero de classes
-                        , activation='sigmoid'))
 
         print("Compilando")
-
         learning_rate = 0.1
         decay_rate = learning_rate / self.epochs
         momentum = 0.8
         sgd = SGD(lr=learning_rate, momentum=momentum, decay=decay_rate, nesterov=False)
         model.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy'])
 
-
-
-        print("\nSalvando o diagrama do modelo")
-
-        # salva o diagrama do modelo com o id do cromossomo
-        # plot_model(model, to_file=str(self.id)+'_model.png', show_shapes=True)
-
         print("Iniciando treinamento")
-
         earlyStopping = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10, verbose=1, mode='auto')
-        history = model.fit(x=X_tr, y=Y_tr, batch_size=batch_size,
-                            epochs=1,#50
+        print(X_train.shape)
+        history = model.fit(X_train, y_train, batch_size=self.batch_size,
+                            epochs=self.epochs,
                             callbacks=[earlyStopping],
                             validation_data=[X_val, Y_val],
                             shuffle=True,
                             verbose=2)
 
-        # Salva o resultado de treinamento
-        plt.clf()
-        plt.plot(history.history['acc'])
-        plt.plot(history.history['val_acc'])
-        plt.title('model accuracy')
-        plt.ylabel('accuracy')
-        plt.xlabel('epoch')
-        plt.legend(['train', 'validation'], loc='upper left')
-        # plt.savefig(str(self.id)+'_accuracy')
-        plt.clf()
-
-        # summarize history for loss
-        plt.plot(history.history['loss'])
-        plt.plot(history.history['val_loss'])
-        plt.title('model loss')
-        plt.ylabel('loss')
-        plt.xlabel('epoch')
-        plt.legend(['train', 'validation'], loc='upper left')
-        # plt.savefig(str(self.id)+'_loss')
-
         train_acc = history.history['acc'][-1]
         val_acc = history.history['val_acc'][-1]
 
 
-        print('\n acc' , val_acc)
-        ##metrics
-        predictions = model.predic(X_te, batch_size=batch_size)
-        print(classification_report(Y_te.argmax(axis=1),
+        # metrics################################################################
+        print('\n acc', val_acc)
+        predictions = model.predict(X_test, batch_size=batch_size)
+        print(classification_report(y_test.argmax(axis=1),
                                     predictions.argmax(axis=1)))
-        report_lr = precision_recall_fscore_support(Y_te.argmax(axis=1),
-                                    predictions.argmax(axis=1),
-                                            average='macro')
+        report_lr = precision_recall_fscore_support(y_test.argmax(axis=1),
+                                                    predictions.argmax(axis=1),
+                                                    average='macro')
 
         print("\nprecision = %0.2f, recall = %0.2f, F1 = %0.2f, accuracy = %0.2f\n" % \
-              (report_lr[0], report_lr[1], report_lr[2], accuracy_score(Y_te.argmax(axis=1),
-                                    predictions.argmax(axis=1))))
-        
+              (report_lr[0], report_lr[1], report_lr[2], accuracy_score(y_test.argmax(axis=1),
+                                                                        predictions.argmax(axis=1))))
         train_epochs = len(history.history['acc'])
-
-        start = time.time()
-
-        # Testa
-        test_scores = model.evaluate(X_te, Y_te, verbose=0)
-
-        end = time.time()
-        test_ms = round((end - start) * 1000, 1)
-        print("Test time: ", test_ms, " ms")
-
-        test_acc = test_scores[1]
-        print('Test accuracy:', test_acc)
+        ##########################################################################
 
         from keras import backend as K
         if K.backend() == 'tensorflow':
@@ -320,34 +258,86 @@ class DnnProblem(Problem):
 
         self.id += 1
 
-        # retorna os objetivos (acuracia e tempo
-        solution.objectives[:] = [-val_acc, test_ms]
+        solution.objectives[:] = [-val_acc, - report_lr[2]]
+
+        variaveis = []
+        print(solution.objectives)
+        for i in solution.variables:
+            variaveis.append(i)
+        self.solucoes.update({solution.objectives: variaveis})
+
+        # Salvar dados
+        print("Salvando dados...")
+        row = solution.objectives
+        writeCSV('files.csv', row)
 
 
-optimizer = SMPSO(problem=DnnProblem(name="pso"),
-                           swarm_size=5,
-                           leader_size=5,
-                           generator=RandomGenerator(),
-                           mutation_probability=0.1,
-                           mutation_perturbation=0.5,
-                           max_iterations=5,
-                           mutate=None)
+# MAIN
 
-# define quantidade de gerações
-num_generations = 5
+if __name__ == '__main__':
+    print("Carregando Base")
 
-# inicia o algoritmo
-for i in range(num_generations):
-    # executa por uma geração
-    optimizer.run(1)
+    # Base Gestos
 
-    # salva gráficos de acurácia de validação e tempo para cada geração
-    plt.clf()
-    plt.xlim([0, 1])
-    plt.ylim([0, 10])
+    # indica pasta da base de dados, uma pasta com imagens para cada classe
+    pasta_base = 'Gestures/'
 
-    plt.scatter([-s.objectives[0] for s in optimizer.result],
-                [s.objectives[1] for s in optimizer.result], c='b', marker='o')
-    plt.xlabel("$accuracy$")
-    plt.ylabel("$recognition_time$")
-    plt.savefig('NSGAIII_gen' + '_' + str(i))
+    # tamanho do batch de treinamento
+    batch_size = 200
+
+    nb_db_samples, num_classes = getNumSamples(pasta_base)
+
+    print('Base tem ', nb_db_samples, ' imagens e ', num_classes, ' classes')
+
+    # tamanho da imagem
+    options_im_size = [16, 32, 48, 64]
+    im_sz = random.randint(0, 3)
+    img_width, img_height = options_im_size[im_sz], options_im_size[im_sz]
+    print('Rescaling database to', img_width, 'x', img_height, ' pixels')
+    base_x, base_y = array_from_dir(data_dir=pasta_base, nb_samples=nb_db_samples,
+                                    nb_classes=num_classes, width=img_width, height=img_height)
+
+    print("Configurando Problem")
+    problem2 = script(name='Problem', base_x=base_x, base_y=base_y,
+                      lencategories=num_classes)  # Qualquer outra base usar esse
+
+    print("Configurando Otimizador")
+    optimizer = SMPSO(problem2,
+                       swarm_size=30,
+                       leader_size=5,
+                       generator=RandomGenerator(),
+                       mutation_probability=0.1,
+                       mutation_perturbation=0.5,
+                       max_iterations=100,
+                       mutate=None)
+
+    print("Rodando o codigo")
+    num_repet = 10
+    repeticao = 0
+
+    soma = 0
+    soma_fm = 0
+    soma_t = 0
+
+    for i in range(num_repet):
+        # executa por uma geracao
+        repeticao += 1
+        print("::::Repeticao: ", repeticao, "::::")
+        start = time.time()
+        optimizer.run(1)
+        end = time.time()
+        print(">>>>>>>>>>>>>RESULT<<<<<<<<<<<<<<<\n")
+        val = (optimizer.result)[0].objectives
+        print("Objective", -val[0], "fm ", -val[1])
+
+
+
+        tmp = round((end - start), 2)
+
+        soma_t = soma_t + tmp
+        soma = soma + (-val[0])
+        soma_fm = soma_fm + (-val[1])
+
+    print("Media acuracia ", soma / num_repet, "i ", num_repet)
+    print("Media tmpo ", soma_t / num_repet, "i ", num_repet)
+    print("Media fm ", soma_fm / num_repet, "i ", num_repet)
