@@ -1,4 +1,3 @@
-
 from keras.models import *
 from keras.layers import *
 from keras.callbacks import EarlyStopping
@@ -18,46 +17,53 @@ import numpy as np
 from scipy.misc import imread, imresize
 from sklearn.model_selection import train_test_split
 from glob import glob
+from scipy.io import arff
+import pandas as pd
 
 print(sys.version)
 
 
-def configBase(x_train, y_train, x_test, y_test, img_rows, img_cols):
-      tamanho=x_train.shape
-      print(tamanho)
-      if(len(tamanho)==4):
-            # convert class vectors to binary class matrices
-            y_train = keras.utils.to_categorical(y_train, num_classes)
-            y_test = keras.utils.to_categorical(y_test, num_classes)
-            
-      elif(len(tamanho)==3):
-            x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
-            x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
-            input_shape = (img_rows, img_cols, 1)
+def load_base(name):
+        data= arff.loadarff(name)    
+        df = pd.DataFrame(data[0])
+        df=df.as_matrix(columns=df.columns[0:])
+        base_y=[]
+        base_x=[]
+        for i in df:
+            for j in i:
+                if(j==b'1' or j==b'2' or j==b'3'):
+                            base_y.append(j)
+                else:
+                        base_x.append(j)
+        base_x=np.reshape(base_x,(-1,13))
+        base_y=np.reshape(base_y,(-1,1))
+        return base_x, base_y	
+
+def configBase(x_train, y_train, x_test, y_test):
+     
+            x_train = np.expand_dims(x_train, axis=2)
+            x_test = np.expand_dims(x_test, axis=2)
             x_train = x_train.astype('float32')
             x_test = x_test.astype('float32')
             x_train /= 255
             x_test /= 255
             
-            # convert class vectors to binary class matrices
-            y_train = keras.utils.to_categorical(y_train, num_classes)
-            y_test = keras.utils.to_categorical(y_test, num_classes)
-      else:
-            print("Tamanho estranho. Por favor coloque bases com shape de tamanha 3 ou 4")
-            print("Retornando None")
-            return None      
-      return x_train, y_train, x_test, y_test
+            y_train = keras.utils.to_categorical(y_train) #talvez o erro esteja aqui e eu nao to sabendo interpretar
+            y_test = keras.utils.to_categorical(y_test)   #talvez o erro esteja aqui e eu nao to sabendo interpretar
+            writeCSV('train.csv', y_train)
+            writeCSV('teste.csv', y_test)
+            return x_train, y_train, x_test, y_test
 
 # Salvar em arquivos
 def writeCSV(nameFile, row):
-    fileCSV = csv.writer(open(nameFile, "a"))
-    fileCSV.writerow(row)
-
-
+        outfile = open(nameFile, "a")
+        fileCSV = csv.writer(outfile)
+        fileCSV.writerow(row)
+        outfile.close()
 
 # Script
 class script(Problem):
-    def __init__(self, name, base):
+    def __init__(self, name, base_x, base_y,lencategories):
         # 0	        1
         encoding = [Integer(2, 3), Integer(1, 2),
                     # 2	        3	    4		      5
@@ -72,8 +78,9 @@ class script(Problem):
         super(script, self).__init__(variables, objectives)
         self.types[:] = encoding
         self.class_name = name
-        self.base = base
-        self.lencategories=len(cancer.target_names)
+        self.base_x = base_x
+        self.base_y = base_y
+        self.lencategories=lencategories
 
         self.batch_size = 200  # de quanto em quanto vai caminhar
         self.epochs = 50  # repeticoes
@@ -82,26 +89,27 @@ class script(Problem):
 
 
     def DefaulttDNN(self, input_shape, lencategories):
+        print(input_shape)
         model = Sequential()
-        model.add(Conv2D(filters=5, kernel_size=4, padding="same", input_shape=input_shape))
-        model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
-        model.add(MaxPooling2D(pool_size=[2, 2], strides=2))
-        model.add(Conv2D(filters=5, kernel_size=4, padding="same"))
+        model.add(Conv1D(filters=5, kernel_size=4, padding="same", input_shape=input_shape))
+        model.add(Conv1D(filters=5, kernel_size=4, padding="same"))
+        model.add(MaxPooling1D(pool_size= 2, strides=2))
+        model.add(Conv1D(filters=5, kernel_size=4, padding="same"))
         model.add(Flatten())
-        model.add(Dense(units=5, activation='softmax'))
+        model.add(Dense(units=self.lencategories, activation='softmax'))
         return model
 
     def ModifieddDNN(self, numCamadasModf, model, solution, lencategories, input_shape):
         md = Sequential()
         for i in range(1, 7, 1):
-            if (i < numCamadasModf or i == 5 or i == 1 or i == 2):
+            if (i < numCamadasModf or i == 5 or i == 1 or i == 2 ):
                 md.add(model.get_layer(None, i))
             else:
                 if (i == 3):
-                    md.add(MaxPooling2D(pool_size=(solution.variables[0], solution.variables[0]),
+                    md.add(MaxPooling1D(pool_size=solution.variables[0],
                                         strides=solution.variables[1]))
                 elif (i == 4):
-                    md.add(Conv2D(filters=solution.variables[2], kernel_size=solution.variables[5],
+                    md.add(Conv1D(filters=solution.variables[2], kernel_size=solution.variables[5],
                                   strides=solution.variables[4], padding="same"))
                 elif (i == 6):
                     md.add(Dense(units=self.lencategories, activation='softmax'))
@@ -113,21 +121,20 @@ class script(Problem):
     def evaluate(self, solution):
         
         # 3) Separa aleatoriamente em treinamento (60%), validação (20%) e teste (20%)
-        x_train, y_train, x_test, y_test= train_test_split(cancer.data, cancer.target, stratify=cancer.target, random_state=66) 
-        X_train, Y_train, X_test, Y_test= configBase(x_train, y_train, x_test, y_test, img_rows, img_cols)
-
-
+        X_train, X_test, Y_train, Y_test = train_test_split(self.base_x,self.base_y,test_size=0.2,random_state=0)
+        X_train, Y_train, X_test, Y_test = configBase(X_train, Y_train, X_test, Y_test)
+        
         print("Criando o modelo")
 
-        
+        #https://stackoverflow.com/questions/43396572/dimension-of-shape-in-conv1d/43399308#43399308
 
-        modelPadrao = self.DefaulttDNN(input_shape=self.X_train.shape[1:],
+        modelPadrao = self.DefaulttDNN(input_shape=X_train.shape[1:],
                                        lencategories=self.lencategories)
 
         print(modelPadrao.summary())
 
         model = self.ModifieddDNN(numCamadasModf=solution.variables[7], model=modelPadrao, solution=solution,
-                                  lencategories=self.lencategories, input_shape=self.X_train.shape[1:])
+                                  lencategories=self.lencategories, input_shape=X_train.shape[1:])
 
         print(model.summary())
 
@@ -136,12 +143,14 @@ class script(Problem):
         decay_rate = learning_rate / self.epochs
         momentum = 0.8
         sgd = SGD(lr=learning_rate, momentum=momentum, decay=decay_rate, nesterov=False)
-        model.compile(loss='binary_crossentropy', optimizer=sgd, metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy', optimizer=sgd, metrics=['accuracy'])
 
         print("Iniciando treinamento")
+        print(X_train.shape)
+        print(Y_train.shape)
         earlyStopping = EarlyStopping(monitor='val_acc', min_delta=0.001, patience=10, verbose=1, mode='auto')
 
-        history = model.fit(X_train, Y_train, batch_size=self.batch_size,
+        history = model.fit(x=X_train, y=Y_train, batch_size=self.batch_size,
                             epochs=self.epochs,
                             callbacks=[earlyStopping],
                             validation_split=0.33,
@@ -154,15 +163,15 @@ class script(Problem):
 
         # metrics################################################################
         print('\n acc', val_acc)
-        predictions = model.predict(X_test, batch_size=batch_size)
-        print(classification_report(y_test.argmax(axis=1),
+        predictions = model.predict(X_test, batch_size=self.batch_size)
+        print(classification_report(Y_test.argmax(axis=1),
                                     predictions.argmax(axis=1)))
-        report_lr = precision_recall_fscore_support(y_test.argmax(axis=1),
+        report_lr = precision_recall_fscore_support(Y_test.argmax(axis=1),
                                                     predictions.argmax(axis=1),
                                                     average='macro')
 
         print("\nprecision = %0.2f, recall = %0.2f, F1 = %0.2f, accuracy = %0.2f\n" % \
-              (report_lr[0], report_lr[1], report_lr[2], accuracy_score(y_test.argmax(axis=1),
+              (report_lr[0], report_lr[1], report_lr[2], accuracy_score(Y_test.argmax(axis=1),
                                                                         predictions.argmax(axis=1))))
         train_epochs = len(history.history['acc'])
         ##########################################################################
@@ -191,23 +200,17 @@ class script(Problem):
 
 if __name__ == '__main__':
     print("Carregando Base")
-    #sklearn.datasets.load_breast_cancer -> Wisconsin Diagnostic Breast Cancer https://github.com/patrickmlong/Breast-Cancer-Wisconsin-Diagnostic-DataSet/blob/master/Breast%20Cancer%20Wisconsin%20(Diagnostic)%20DataSet_in_progress.ipynb
-#https://github.com/Elhamkesh/Breast-Cancer-Scikitlearn/blob/master/CancerML.ipynb
-    cancer=load_breast_cancer()
-    
-    #No longer exist -> IRMA
-    #Archive -> ISIC
-    #Archive -> Wisconsis Breast Cancer
+    base1="mamografia_Haralick.arff"
+    base2="mamografia_LBP.arff"
+    base3="mamografia_Seg-Zernike.arff"
+    base4="melanoma_Haralick.arff"
+    base5="melanoma_LBP.arff"
+    base_x,base_y= load_base(base2)
 
-
-    
-
-    # tamanho da imagem
-    
-    print(len(cancer.feature_names))
     print("Configurando Problem")
-    problem2 = script(name='Problem', base= cancer)  
 
+    problem2 = script(name='Problem', base_x=base_x, base_y=base_y, lencategories=4) 
+    
     print("Configurando Otimizador")
     optimizer = SMPSO(problem2,
                        swarm_size=5,
@@ -250,7 +253,12 @@ if __name__ == '__main__':
     print("Media fm ", soma_fm / num_repet, "i ", num_repet)
 
     print("Salvando as médias de dados...")
-    rowAcc = soma_fm / num_repet
-    rowFm = soma_fm / num_repet
+    
+    rowAcc = []
+    rowAcc.append(soma / num_repet)
+    rowFm = []
+    rowFm.append(soma_fm / num_repet)
+    print(rowAcc)
+    print(rowFm)
     writeCSV('MediaACC.csv', rowAcc)
     writeCSV('MediaFM.csv', rowFm)
