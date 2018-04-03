@@ -24,20 +24,32 @@ print(sys.version)
 
 
 def load_base(name):
+        
         data= arff.loadarff(name)    
         df = pd.DataFrame(data[0])
+        lista=df.columns.values.tolist()
         df=df.as_matrix(columns=df.columns[0:])
         base_y=[]
         base_x=[]
         for i in df:
             for j in i:
-                if(j==b'1' or j==b'2' or j==b'3'):
+                if(j==b'0' or j==b'1' or j==b'2' or j==b'3'):
                             base_y.append(j)
                 else:
                         base_x.append(j)
-        base_x=np.reshape(base_x,(-1,13))
-        base_y=np.reshape(base_y,(-1,1))
-        return base_x, base_y	
+        print(len(lista))
+        if(len(lista)==14):
+                base_x=np.reshape(base_x,(-1,13))
+                base_y=np.reshape(base_y,(-1,1))
+        elif(len(lista)==26):
+                base_x=np.reshape(base_x,(-1,25))
+                base_y=np.reshape(base_y,(-1,1))
+        elif(len(lista)==27):
+                base_x=np.reshape(base_x,(-1,26))
+                base_y=np.reshape(base_y,(-1,1))
+        maxClass=max(base_y)
+        maxClass=maxClass.astype(str).astype(int)
+        return base_x, base_y, maxClass	
 
 def configBase(x_train, y_train, x_test, y_test):
      
@@ -119,14 +131,13 @@ class script(Problem):
         return self.solucoes.get(info)
 
     def evaluate(self, solution):
-        
-        # 3) Separa aleatoriamente em treinamento (60%), validação (20%) e teste (20%)
+        print(self.base_x.shape)
+        print(self.base_y.shape)
+
         X_train, X_test, Y_train, Y_test = train_test_split(self.base_x,self.base_y,test_size=0.2,random_state=0)
         X_train, Y_train, X_test, Y_test = configBase(X_train, Y_train, X_test, Y_test)
         
         print("Criando o modelo")
-
-        #https://stackoverflow.com/questions/43396572/dimension-of-shape-in-conv1d/43399308#43399308
 
         modelPadrao = self.DefaulttDNN(input_shape=X_train.shape[1:],
                                        lencategories=self.lencategories)
@@ -205,11 +216,11 @@ if __name__ == '__main__':
     base3="mamografia_Seg-Zernike.arff"
     base4="melanoma_Haralick.arff"
     base5="melanoma_LBP.arff"
-    base_x,base_y= load_base(base2)
+    base_x,base_y,maxClass= load_base(base5)
 
     print("Configurando Problem")
 
-    problem2 = script(name='Problem', base_x=base_x, base_y=base_y, lencategories=4) 
+    problem2 = script(name='Problem', base_x=base_x, base_y=base_y, lencategories=maxClass+1) #lencategories-> mudar nome da variavel. 
     
     print("Configurando Otimizador")
     optimizer = SMPSO(problem2,
