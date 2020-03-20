@@ -204,7 +204,7 @@ class script(Problem):
                                         nb_classes=num_classes, width=img_width, height=img_height)'''
 
         # 3) Separa aleatoriamente em treinamento (60%), validação (20%) e teste (20%)
-        X_train, y_train, X_test, y_test, X_val, Y_val = split_dataset_random(self.base_x, self.base_y, 0.1, 0.1)
+        X_train, y_train, X_test, y_test, _, _ = split_dataset_random(self.base_x, self.base_y, 0.1, 0.1)
         #X_train, X_test, y_train, y_test = train_test_split(self.base_x, self.base_y, test_size=0.01,                                                           random_state=0)  # ''0.01'''
         #X_train, X_test, y_train, y_test = train_test_split(X_test, y_test, test_size=0.1, random_state=0)
 
@@ -216,7 +216,7 @@ class script(Problem):
 
         #print(modelPadrao.summary())
 
-        shape=(X_train[0].shape[0], X_train[0].shape[1], 1)
+        #shape=(X_train[0].shape[0], X_train[0].shape[1], 1)
         model = self.ModifieddDNN( solution=solution, input_shape=self.X_train.shape[1:])
 
         print(model.summary())
@@ -247,7 +247,7 @@ class script(Problem):
         plt.legend(['train', 'validation'], loc='upper left')
         # plt.savefig(str(self.id)+'_accuracy')
         plt.clf()
-        train_acc = history.history['acc'][-1]
+        # train_acc = history.history['acc'][-1]
         val_acc = history.history['val_acc'][-1]
 
         # metrics################################################################
@@ -262,7 +262,7 @@ class script(Problem):
         print("\nprecision = %0.2f, recall = %0.2f, F1 = %0.2f, accuracy = %0.2f\n" % \
               (report_lr[0], report_lr[1], report_lr[2], accuracy_score(y_test.argmax(axis=1),
                                                                         predictions.argmax(axis=1))))
-        train_epochs = len(history.history['acc'])
+        #train_epochs = len(history.history['acc'])
         ##########################################################################
 
         from keras import backend as K
@@ -336,7 +336,7 @@ def configBase(x_train, y_train, x_test, y_test, img_rows, img_cols):
     elif (len(tamanho) == 3):
         x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
         x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
-        input_shape = (img_rows, img_cols, 1)
+        #input_shape = (img_rows, img_cols, 1)
         x_train = x_train.astype('float32')
         x_test = x_test.astype('float32')
         x_train /= 255
@@ -445,61 +445,6 @@ num_classes=10
 print("Configurando Base")
 x_train, y_train, x_test, y_test = configBase(x_train, y_train, x_test, y_test, img_rows, img_cols)
 print("Configurando Problem")
-'''
-problem2 = script(name='Problem', base_x=x_train, base_y=y_train,lencategories=num_classes)  # Qualquer outra base usar esse
-# define o algoritmo de otimização
-optimizer = NSGAII(problem=problem2, population_size=10)
- # define quantidade de gerações
-num_generations = 3
-#Modelo proposto
-# inicia o algoritmo
-start = time.time()
-acuracia=[]
-geracao=[]
-fmeasure=[]
-for i in range(num_generations):
-    # executa por uma geração
-    optimizer.run(1)
-    print(">>>>>>>>>>>>>RESULT<<<<<<<<<<<<<<<\n")
-    val = (optimizer.result)[0].objectives
-    print("Objective", -val[0], "fm ", -val[1])
-    arq = open('cifar1.txt','a')
-    result= "Objective "+ str(-val[0])+ " fm "+ str(-val[1])
-    arq.write(result)
-    arq.write("\n")
-    arq.close()
-    print("Salvando dados...")
-    row = -val[0], -val[1]
-    writeCSV('CIFAR.csv', row)
-    acuracia.append(-val[0])
-    fmeasure.append(-val[1])
-    geracao.append(i)
-# salva gráficos de acurácia de validação e tempo para cada geração
-plt.clf()
-plt.xlim([0, num_generations])
-plt.ylim([0, 1])
-plt.scatter([s for s in geracao],
-                [s for s in acuracia], c='b', marker='o')
-plt.xlabel("$Geração$")
-plt.ylabel("$Acurácia$")
-plt.savefig('cifar' + '_' + 'acuracia1')
-plt.clf()
-plt.xlim([0, num_generations])
-plt.ylim([0, 1])
-plt.scatter([s for s in geracao],
-                [s for s in fmeasure], c='b', marker='o')
-plt.xlabel("$Geração$")
-plt.ylabel("$Fmeasue$")
-plt.savefig('cifar' + '_' + 'fmeasure1')
-end = time.time()
-tmp = round((end - start), 2)
-print("Tempo ", tmp)
-arq = open('cifar1.txt','a')
-result= ("Tempo "+ str(tmp))
-arq.write(result)
-arq.write("\n")
-arq.close()
-'''
 
 # metodo aleatorio
 soma =0
